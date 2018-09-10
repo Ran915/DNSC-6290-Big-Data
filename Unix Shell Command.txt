@@ -1,0 +1,70 @@
+############assignment 1
+hadoop jar /usr/lib/hadoop/hadoop-streaming.jar \
+-files mapper.py,reducer.py \
+-input s3://path/file \
+-output s3://path/directory \
+-mapper mapper.py \
+-reducer reducer.py
+
+hadoop fs -cat directory/part*  | sort > results.txt
+
+############assignment 2 
+##<Ctr C> kill a command]
+##<Ctr D> end a command]
+hadoop fs -mkdir bigrams
+hadoop distcp s3://bigdatateaching/bigrams/googlebooks-eng-us-all-2gram-20120701-i? bigrams/
+hadoop fs -ls bigrams/
+>pig
+
+#######quit<in hadoop>
+nano 
+[
+a1 = LOAD '/user/hadoop/bigrams/googlebooks-eng-us-all-2gram-20120701-i?' AS (ngram:chararray,year:int,occurrences:float,books:float);
+a2 = GROUP a1 BY ngram;
+a3 = FOREACH a2 GENERATE group,SUM(a1.occurrences) AS total_occur,SUM(a1.books) AS total_books,SUM(a1.occurrences)/SUM(a1.books) AS avg_occur,MIN(a1.year) AS min_year,MAX(a1.year) AS max_year,COUNT(a1.year) as records;
+a4 = FILTER a3 BY ((min_year == 1950) AND (records == 60));
+a5 = ORDER a4 BY avg_occur DESC;
+a6 = LIMIT a5 10;
+STORE a6 INTO 'files';
+copyToLocal /files <dest>
+]
+##<Ctr+O save>
+##<enter name>
+##<Ctr+X exit>
+
+pig pig-script.pig
+hadoop fs -ls files/
+hadoop fs -cat files/part-* > pig-results.csv 
+ls -la
+cat pig-results.csv 
+
+>hive
+nano[
+create external table gram (
+ngram string, 
+year int,
+occurrences float,
+books float
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+LOCATION '/user/hadoop/store';
+
+LOAD DATA INPATH '/user/hadoop/bigrams/googlebooks-eng-us-all-2gram-20120701-i?' OVERWRITE INTO TABLE gram;
+
+INSERT OVERWRITE DIRECTORY 'file2'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+SELECT ngram,SUM(occurrences) AS total_occur,SUM(books) AS total_books,SUM(occurrences)/SUM(books) AS avg_occur,MIN(year) AS min_year,MAX(year) AS max_year,COUNT(year) as records
+FROM gram
+GROUP BY ngram
+HAVING min_year==1950 AND records==60
+ORDER BY avg_occur DESC
+LIMIT 10;
+
+hadoop fs -ls hives/
+hadoop fs -cat hives/000000_0 > hive-results.csv 
+ls -la
+cat hive-results.csv 
+
+
